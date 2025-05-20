@@ -2,7 +2,7 @@
 
 import React from 'react';
 import { NavigationContainer } from '@react-navigation/native';
-import CareReceiverApp from './src/components/CareReceiverApp';
+import CareReceiverApp from './src/screens/CareReceiverApp';
 import { UserProvider } from './src/context/UserContext';
 
 const App = () => {

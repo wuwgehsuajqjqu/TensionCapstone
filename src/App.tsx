@@ -1,6 +1,6 @@
 import React from 'react';
 import { UserProvider } from './context/UserContext';
-import CareReceiverApp from './components/CareReceiverApp';
+import CareReceiverApp from './screens/CareReceiverApp';
 
 const App = () => {
   return (

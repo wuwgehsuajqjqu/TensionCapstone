@@ -18,7 +18,7 @@ import Geolocation from 'react-native-geolocation-service';
 import { format } from 'date-fns';
 import { ko } from 'date-fns/locale';
 import { useUser } from '../context/UserContext';
-import { Schedule } from '../types/schedule';
+import { Schedule } from '../types';
 import { api } from '../api/api';
 
 // 이미지 import
@@ -46,7 +46,7 @@ type Props = {
 };
 
 const CareReceiverMain = ({ navigation }: Props) => {
-  const { userId, isLoading: isUserLoading } = useUser();
+  const { userId, isLoading: isUserLoading, userName } = useUser();
   const [locationPermission, setLocationPermission] = useState(false);
   const [currentTime, setCurrentTime] = useState(new Date());
   const [schedules, setSchedules] = useState<Schedule[]>([]);
@@ -66,19 +66,12 @@ const CareReceiverMain = ({ navigation }: Props) => {
     }
 
     try {
-      const data = await api.getSchedules(userId);
-      // 일정을 시간순으로 정렬
-      const sortedSchedules = data.sort((a: Schedule, b: Schedule) => {
-        const timeA = a.isRecurring ? a.recurringTime : a.oneTimeDateTime;
-        const timeB = b.isRecurring ? b.recurringTime : b.oneTimeDateTime;
-        
-        if (!timeA || !timeB) return 0;
-        return timeA.localeCompare(timeB);
-      });
-      setSchedules(sortedSchedules);
+      const data = await api.schedule.getSchedules(userId);
+      console.log('✅ 받아온 일정:', data);
+      setSchedules(data);
     } catch (error) {
-      console.error('일정 로딩 실패:', error);
-      setError('일정을 불러오는데 실패했습니다.');
+      console.error('일정 조회 실패:', error);
+      Alert.alert('오류', '일정을 불러오는데 실패했습니다.');
     } finally {
       setIsLoading(false);
     }
@@ -103,7 +96,7 @@ const CareReceiverMain = ({ navigation }: Props) => {
 
   const sendLocationToServer = async (latitude: number, longitude: number) => {
     try {
-      await api.sendLocation(latitude, longitude);
+      await api.location.sendLocation(latitude, longitude);
       console.log('위치 정보가 성공적으로 전송되었습니다.');
     } catch (error) {
       console.error('위치 정보 전송 중 오류 발생:', error);
@@ -137,7 +130,7 @@ const CareReceiverMain = ({ navigation }: Props) => {
   // 일정 완료 처리
   const handleScheduleComplete = async (scheduleId: number) => {
     try {
-      await api.completeSchedule(scheduleId);
+      await api.schedule.completeSchedule(scheduleId);
       
       // 일정 목록 새로고침
       const updatedSchedules = schedules.map(schedule =>
@@ -270,11 +263,11 @@ const CareReceiverMain = ({ navigation }: Props) => {
         </View>
 
         <ScrollView style={styles.scheduleList}>
-          {schedules.map((schedule) => (
+          {schedules.map((schedule, idx) => (
             <TouchableOpacity
-              key={schedule.id}
+              key={schedule.id || idx}
               style={styles.scheduleItem}
-              onPress={() => handleScheduleComplete(schedule.id)}
+              onPress={() => handleScheduleComplete(schedule.id!)}
             >
               <Image
                 source={schedule.type === 'MEDICATION' ? pillIcon : hospitalIcon}
@@ -295,6 +288,13 @@ const CareReceiverMain = ({ navigation }: Props) => {
 
       {/* 테스트용 일정확인 버튼 */}
       <TouchableOpacity 
+        style={[styles.checkButton, { backgroundColor: '#FF6B6B', bottom: 80 }]}
+        onPress={() => navigation.navigate('EmotionCheck')}
+      >
+        <Text style={styles.checkButtonText}>감정 체크</Text>
+      </TouchableOpacity>
+
+      <TouchableOpacity 
         style={styles.checkButton}
         onPress={handleScheduleCheck}
       >
@@ -310,6 +310,34 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#FFFFFF',
+  },
+  header: {
+    padding: 20,
+    marginTop: 60,
+    alignItems: 'center',
+  },
+  headerTitle: {
+    color: '#000000',
+    fontSize: 36,
+    fontWeight: 'bold',
+    fontFamily: 'Montserrat-Bold',
+  },
+  buttonContainer: {
+    width: '100%',
+    paddingHorizontal: 20,
+    gap: 10,  // 버튼 사이 간격 추가
+  },
+  button: {
+    backgroundColor: '#007AFF',
+    paddingVertical: 15,
+    borderRadius: 10,
+    alignItems: 'center',
+    marginBottom: 10,
+  },
+  buttonText: {
+    color: '#fff',
+    fontSize: 18,
+    fontWeight: 'bold',
   },
   timeContainer: {
     padding: 20,

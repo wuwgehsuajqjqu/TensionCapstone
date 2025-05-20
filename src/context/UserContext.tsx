@@ -1,6 +1,8 @@
 //사용자정보관리
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { API_BASE_URL, API_ENDPOINTS } from '../api/api';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { api } from '../api/api';
+import messaging from '@react-native-firebase/messaging';
 
 type UserContextType = {
   userId: string | null;
@@ -22,15 +24,20 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
     try {
       setIsLoading(true);
       setError(null);
-      const response = await fetch(`${API_BASE_URL}${API_ENDPOINTS.USERS}/1`);
-      if (!response.ok) {
-        throw new Error('사용자 정보를 불러오는데 실패했습니다.');
+      
+      console.log('Fetching user info...');
+      const userList = await api.user.getUserInfo();
+      console.log('Received user data:', userList);
+      
+      const user = userList[0];
+      if (!user || !user.id) {
+        throw new Error('사용자 정보가 올바르지 않습니다.');
       }
-      const data = await response.json();
-      setUserId(data.id.toString());
-      setUserName(data.name);
+
+      setUserId('130');  // 하드코딩된 id
+      setUserName(user.name || '사용자');
     } catch (error) {
-      console.error('사용자 정보 불러오기 실패:', error);
+      console.error('사용자 정보 조회 실패:', error);
       setError(error instanceof Error ? error.message : '알 수 없는 오류가 발생했습니다.');
     } finally {
       setIsLoading(false);

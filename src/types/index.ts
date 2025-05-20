@@ -20,9 +20,9 @@ export interface User {
   id?: number;
   name: string;
   email: string;
-  password: string;
-  phone: string;
-  role: UserRole;
+  phoneNumber: string;
+  role: 'PROTECTOR' | 'PROTECTED';
+  protectorId?: number;
 }
 
 export interface HealthStatus {
@@ -43,6 +43,10 @@ export interface Schedule {
   recurringTime?: string;
   oneTimeDateTime?: string;
   completed: boolean;
+  hour?: number;
+  minute?: number;
+  time?: string;
+  message?: string;
 }
 
 export interface Location {
@@ -50,18 +54,21 @@ export interface Location {
   latitude: number;
   longitude: number;
   timestamp: string;
-  protectedUserId: number;
+  userId: number;
 }
 
 export interface Notification {
-  numId?: number;
-  userId: string;
+  id?: number;
   title: string;
   body: string;
+  userId: number;
+  createdAt: string;
+  read: boolean;
 }
 
 export interface FCMToken {
-  numId?: number;
-  userId: string;
+  id?: number;
+  userId: number;
   token: string;
+  createdAt: string;
 } 

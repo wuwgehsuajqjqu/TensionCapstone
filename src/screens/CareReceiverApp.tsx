@@ -1,10 +1,10 @@
 //앱 네비게이터 구조 정의
 import React from 'react';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
-import CareReceiverMain from './CareReceiverMain';
-import TodayCheck from './TodayCheck';
-import EmotionCheck from './EmotionCheck';
-import ResultScreen from './ResultScreen';
+import CareReceiverMain from '../screens/CareReceiverMain';
+import TodayCheck from '../screens/TodayCheck';
+import EmotionCheck from '../screens/EmotionCheck';
+import ResultScreen from '../screens/ResultScreen';
 
 export type RootStackParamList = {
   CareReceiverMain: undefined;

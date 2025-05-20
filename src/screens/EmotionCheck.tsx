@@ -4,11 +4,13 @@ import {
   Text,
   StyleSheet,
   TouchableOpacity,
+  Alert,
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RootStackParamList } from './CareReceiverApp';
 import { useUser } from '../context/UserContext';
+import { api } from '../api/api';
 
 type NavigationProp = NativeStackNavigationProp<RootStackParamList>;
 
@@ -21,7 +23,7 @@ type Emotion = {
 
 const EmotionCheck = () => {
   const navigation = useNavigation<NavigationProp>();
-  const { userName } = useUser();
+  const { userName, userId } = useUser();
 
   //감정 목록
   const emotions: Emotion[] = [
@@ -31,11 +33,28 @@ const EmotionCheck = () => {
     { emoji: '😢', label: '속상해요', borderColor: '#3498DB', moodStatus: 'SAD' },
   ];
 
-  const handleEmotionSelect = (moodStatus: 'GOOD' | 'OKAY' | 'TIRED' | 'SAD') => {
-    // 결과 화면으로 바로 이동
-    navigation.navigate('ResultScreen', { 
-      emotionType: moodStatus
-    });
+  const handleEmotionSelect = async (emotion: string) => {
+    try {
+      if (!userId) {
+        Alert.alert('오류', '사용자 정보를 찾을 수 없습니다.');
+        return;
+      }
+
+      console.log('감정 선택됨:', emotion);
+
+      // 감정 상태 업데이트
+      const healthStatusId = 65;
+      await api.healthStatus.updateMoodStatus(healthStatusId, emotion as 'GOOD' | 'OKAY' | 'TIRED' | 'SAD');
+
+      Alert.alert(`${emotion} 상태시군요!`);
+      navigation.navigate('ResultScreen', { 
+        emotionType: emotion as 'GOOD' | 'OKAY' | 'TIRED' | 'SAD'
+      });
+
+    } catch (error) {
+      console.error('감정 상태 전송 실패:', error);
+      Alert.alert('오류', '감정 상태를 저장하는데 실패했습니다.');
+    }
   };
 
   return (
