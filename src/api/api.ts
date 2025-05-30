@@ -100,6 +100,7 @@ export const api = {
 
     // 오늘 일정 조회
     getTodaySchedule: async (protectedUserId: number): Promise<Schedule[]> => {
+      console.log('testlog');
       try {
         const response = await fetch(`${API_ENDPOINTS.TODAY_SCHEDULE}/${protectedUserId}`);
         if (!response.ok) {
@@ -144,7 +145,7 @@ export const api = {
     completeSchedule: async (scheduleId: number): Promise<void> => {
       try {
         const response = await fetch(`${API_ENDPOINTS.COMPLETE_SCHEDULE}/${scheduleId}`, {
-          method: 'GET',
+          method: 'PUT',
         });
         if (!response.ok) {
           throw new Error('일정 완료 처리에 실패했습니다.');
@@ -232,12 +233,13 @@ export const api = {
   // Location 관련 API
   location: {
     // 위치 정보 전송
-    sendLocation: async (latitude: number, longitude: number): Promise<void> => {
+    sendLocation: async (protectedUserId:number,latitude: number, longitude: number): Promise<void> => {
       try {
+        const timestamp=new Date().toISOString();
         const response = await fetch(API_ENDPOINTS.LOCATIONS, {
           method: 'POST',
           headers: DEFAULT_HEADERS,
-          body: JSON.stringify({ latitude, longitude }),
+          body: JSON.stringify({ latitude, longitude, timestamp, protectedUserId }),
         });
         if (!response.ok) {
           throw new Error('위치 정보 전송에 실패했습니다.');

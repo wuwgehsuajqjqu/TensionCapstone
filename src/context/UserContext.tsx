@@ -34,7 +34,7 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
         throw new Error('사용자 정보가 올바르지 않습니다.');
       }
 
-      setUserId('130');  // 하드코딩된 id
+      setUserId('1');  // 하드코딩된 id
       setUserName(user.name || '사용자');
     } catch (error) {
       console.error('사용자 정보 조회 실패:', error);

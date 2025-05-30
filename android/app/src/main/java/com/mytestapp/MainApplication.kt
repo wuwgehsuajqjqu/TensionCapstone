@@ -11,6 +11,7 @@ import com.facebook.react.defaults.DefaultReactHost.getDefaultReactHost
 import com.facebook.react.defaults.DefaultReactNativeHost
 import com.facebook.react.soloader.OpenSourceMergedSoMapping
 import com.facebook.soloader.SoLoader
+import com.agontuk.RNFusedLocation.RNFusedLocationPackage
 
 class MainApplication : Application(), ReactApplication {
 
@@ -18,8 +19,17 @@ class MainApplication : Application(), ReactApplication {
       object : DefaultReactNativeHost(this) {
         override fun getPackages(): List<ReactPackage> =
             PackageList(this).packages.apply {
-              // Packages that cannot be autolinked yet can be added manually here, for example:
-              // add(MyReactNativePackage())
+              // RNFusedLocationPackage가 이미 포함되어 있는지 확인
+              var hasLocationPackage = false
+              for (pkg in this) {
+                if (pkg is RNFusedLocationPackage) {
+                  hasLocationPackage = true
+                  break
+                }
+              }
+              if (!hasLocationPackage) {
+                add(RNFusedLocationPackage())
+              }
             }
 
         override fun getJSMainModuleName(): String = "index"

@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import {
   View,
   Text,
@@ -20,6 +20,7 @@ import { ko } from 'date-fns/locale';
 import { useUser } from '../context/UserContext';
 import { Schedule } from '../types';
 import { api } from '../api/api';
+
 
 // 이미지 import
 const pillIcon = require('../assets/images/icons/pill_icon.png');
@@ -53,6 +54,88 @@ const CareReceiverMain = ({ navigation }: Props) => {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  const sendLocationToServer = useCallback(async (latitude: number, longitude: number) => {
+    if (!userId) {
+      console.warn('userId가 없습니다. 위치 전송 생략');
+      return;
+    }
+    try {
+      await api.location.sendLocation(Number(userId), latitude, longitude);
+      console.log('📍 위치 정보 전송 성공:', latitude, longitude);
+    } catch (error) {
+      console.error('위치 정보 전송 중 오류 발생:', error);
+    }
+  }, [userId]);
+
+  const checkLocationPermission = useCallback(async () => {
+    try {
+      const fineLocationResult = await request(PERMISSIONS.ANDROID.ACCESS_FINE_LOCATION);
+      if (fineLocationResult === RESULTS.GRANTED) {
+        console.log('GPS 권한이 허용되었습니다.');
+        const backgroundLocationResult = await request(PERMISSIONS.ANDROID.ACCESS_BACKGROUND_LOCATION);
+        if (backgroundLocationResult === RESULTS.GRANTED) {
+          console.log('백그라운드 위치 권한이 허용되었습니다.');
+          setLocationPermission(true);
+        } else {
+          Alert.alert(
+            '위치 권한 필요',
+            '백그라운드에서도 위치 정보를 수집하기 위해 권한이 필요합니다.',
+            [{ text: '확인' }]
+          );
+        }
+      } else {
+        Alert.alert(
+          '위치 권한 필요',
+          '위치 정보를 수집하기 위해 권한이 필요합니다.',
+          [{ text: '확인' }]
+        );
+      }
+    } catch (error) {
+      console.error('권한 체크 중 오류 발생:', error);
+      Alert.alert('오류', '권한 확인 중 문제가 발생했습니다.');
+    }
+  }, []);
+
+  // 위치 업데이트 설정
+  useEffect(() => {
+    let intervalId: ReturnType<typeof setInterval>;
+    
+    if (locationPermission) {
+      // 초기 위치 전송
+      Geolocation.getCurrentPosition(
+        (position) => {
+          const { latitude, longitude } = position.coords;
+          sendLocationToServer(latitude, longitude);
+        },
+        (error) => {
+          console.error('초기 위치 정보를 가져오는 중 오류 발생:', error);
+        },
+        { enableHighAccuracy: true, timeout: 15000, maximumAge: 10000 }
+      );
+
+      // x분마다 위치 업데이트
+      intervalId = setInterval(() => {
+        Geolocation.getCurrentPosition(
+          (position) => {
+            const { latitude, longitude } = position.coords;
+            sendLocationToServer(latitude, longitude);
+          },
+          (error) => {
+            console.error('위치 정보를 가져오는 중 오류 발생:', error);
+          },
+          { enableHighAccuracy: true, timeout: 15000, maximumAge: 10000 }
+        );
+      }, 10000);
+    }
+
+    return () => {
+      if (intervalId) {
+        clearInterval(intervalId);
+      }
+    };
+  }, [locationPermission, sendLocationToServer]);
+
+  // 권한 체크 및 일정 가져오기
   useEffect(() => {
     fetchSchedules();
     checkLocationPermission();
@@ -66,7 +149,7 @@ const CareReceiverMain = ({ navigation }: Props) => {
     }
 
     try {
-      const data = await api.schedule.getSchedules(userId);
+      const data = await api.schedule.getTodaySchedule(Number(userId));
       console.log('✅ 받아온 일정:', data);
       setSchedules(data);
     } catch (error) {
@@ -75,47 +158,6 @@ const CareReceiverMain = ({ navigation }: Props) => {
     } finally {
       setIsLoading(false);
     }
-  };
-
-  const checkLocationPermission = async () => {
-    const fineLocationResult = await request(PERMISSIONS.ANDROID.ACCESS_FINE_LOCATION);
-    if (fineLocationResult === RESULTS.GRANTED) {
-      console.log('GPS 권한이 허용되었습니다.');
-      const backgroundLocationResult = await request(PERMISSIONS.ANDROID.ACCESS_BACKGROUND_LOCATION);
-      if (backgroundLocationResult === RESULTS.GRANTED) {
-        console.log('백그라운드 위치 권한이 허용되었습니다.');
-        setLocationPermission(true);
-        startLocationUpdates();
-      } else {
-        console.log('백그라운드 위치 권한이 거부되었습니다.');
-      }
-    } else {
-      console.log('GPS 권한이 거부되었습니다.');
-    }
-  };
-
-  const sendLocationToServer = async (latitude: number, longitude: number) => {
-    try {
-      await api.location.sendLocation(latitude, longitude);
-      console.log('위치 정보가 성공적으로 전송되었습니다.');
-    } catch (error) {
-      console.error('위치 정보 전송 중 오류 발생:', error);
-    }
-  };
-
-  const startLocationUpdates = () => {
-    setInterval(() => {
-      Geolocation.getCurrentPosition(
-        (position) => {
-          const { latitude, longitude } = position.coords;
-          sendLocationToServer(latitude, longitude);
-        },
-        (error) => {
-          console.error('위치 정보를 가져오는 중 오류 발생:', error);
-        },
-        { enableHighAccuracy: true, timeout: 15000, maximumAge: 10000 }
-      );
-    }, 60000);
   };
 
   // 현재 시간 업데이트
@@ -131,7 +173,7 @@ const CareReceiverMain = ({ navigation }: Props) => {
   const handleScheduleComplete = async (scheduleId: number) => {
     try {
       await api.schedule.completeSchedule(scheduleId);
-      
+
       // 일정 목록 새로고침
       const updatedSchedules = schedules.map(schedule =>
         schedule.id === scheduleId
@@ -150,7 +192,7 @@ const CareReceiverMain = ({ navigation }: Props) => {
         if (schedule.completed) return false; // 완료된 일정은 건너뛰기
         if (schedule.isRecurring) {
           const [scheduleHour, scheduleMinute] = schedule.recurringTime!.split(':').map(Number);
-          return (scheduleHour > currentHour) || 
+          return (scheduleHour > currentHour) ||
                  (scheduleHour === currentHour && scheduleMinute > currentMinute);
         } else {
           const scheduleDate = new Date(schedule.oneTimeDateTime!);
@@ -174,7 +216,7 @@ const CareReceiverMain = ({ navigation }: Props) => {
         navigation.navigate('TodayCheck', {
           medicationHour,
           medicationMinute,
-          message: nextSchedule.type === 'MEDICATION' 
+          message: nextSchedule.type === 'MEDICINE'
             ? `오늘 ${nextSchedule.title}을(를) 복용하실 시간입니다`
             : `오늘 ${nextSchedule.title}을(를) 방문하실 시간입니다`
         });
@@ -204,7 +246,7 @@ const CareReceiverMain = ({ navigation }: Props) => {
       const nextSchedule = schedules.find(schedule => {
         if (schedule.isRecurring) {
           const [scheduleHour, scheduleMinute] = schedule.recurringTime!.split(':').map(Number);
-          return (scheduleHour > currentHour) || 
+          return (scheduleHour > currentHour) ||
                  (scheduleHour === currentHour && scheduleMinute > currentMinute);
         } else {
           const scheduleDate = new Date(schedule.oneTimeDateTime!);
@@ -232,7 +274,7 @@ const CareReceiverMain = ({ navigation }: Props) => {
       navigation.navigate('TodayCheck', {
         medicationHour,
         medicationMinute,
-        message: nextSchedule.type === 'MEDICATION' 
+        message: nextSchedule.type === 'MEDICINE'
           ? `오늘 ${nextSchedule.title}을(를) 복용하실 시간입니다`
           : `오늘 ${nextSchedule.title}을(를) 방문하실 시간입니다`
       });
@@ -270,14 +312,12 @@ const CareReceiverMain = ({ navigation }: Props) => {
               onPress={() => handleScheduleComplete(schedule.id!)}
             >
               <Image
-                source={schedule.type === 'MEDICATION' ? pillIcon : hospitalIcon}
+                source={schedule.type === 'MEDICINE' ? pillIcon : hospitalIcon}
                 style={styles.scheduleIcon}
               />
               <View style={styles.scheduleTextContainer}>
                 <Text style={styles.scheduleTime}>
-                  {schedule.isRecurring
-                    ? `${schedule.recurringTime?.slice(0, 2)}시 ${schedule.recurringTime?.slice(3, 5)}분`
-                    : format(new Date(schedule.oneTimeDateTime!), 'HH시 mm분')}
+                  {schedule.time}
                 </Text>
                 <Text style={styles.scheduleDesc}>{schedule.title}</Text>
               </View>
@@ -287,14 +327,14 @@ const CareReceiverMain = ({ navigation }: Props) => {
       </View>
 
       {/* 테스트용 일정확인 버튼 */}
-      <TouchableOpacity 
+      <TouchableOpacity
         style={[styles.checkButton, { backgroundColor: '#FF6B6B', bottom: 80 }]}
         onPress={() => navigation.navigate('EmotionCheck')}
       >
         <Text style={styles.checkButtonText}>감정 체크</Text>
       </TouchableOpacity>
 
-      <TouchableOpacity 
+      <TouchableOpacity
         style={styles.checkButton}
         onPress={handleScheduleCheck}
       >

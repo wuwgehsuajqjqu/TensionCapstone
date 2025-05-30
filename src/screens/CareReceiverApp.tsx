@@ -13,6 +13,7 @@ export type RootStackParamList = {
     medicationHour?: number;
     medicationMinute?: number;
     message?: string;
+    scheduleId?: number;
   };
   ResultScreen: { 
     emotionType: 'GOOD' | 'OKAY' | 'TIRED' | 'SAD';

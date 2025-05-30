@@ -12,7 +12,7 @@ export enum MoodStatus {
 }
 
 export enum ScheduleType {
-  MEDICATION = 'MEDICATION',
+  MEDICATION = 'MEDICINE',
   HOSPITAL = 'HOSPITAL'
 }
 
@@ -21,7 +21,7 @@ export interface User {
   name: string;
   email: string;
   phoneNumber: string;
-  role: 'PROTECTOR' | 'PROTECTED';
+  role: UserRole;
   protectorId?: number;
 }
 

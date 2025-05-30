@@ -1,132 +1,121 @@
-import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Alert } from 'react-native';
-import { useNavigation } from '@react-navigation/native';
+import React, { useState, useEffect, useRef } from 'react';
+import {
+  View,
+  Text,
+  StyleSheet,
+  TouchableOpacity,
+  Image,
+  Alert,
+  Platform,
+  BackHandler,
+} from 'react-native';
+import { useNavigation, useRoute } from '@react-navigation/native';
 import { useUser } from '../context/UserContext';
 import { api } from '../api/api';
-import { Ionicons } from '@expo/vector-icons';
-import { Schedule, ScheduleType } from '../types';
 
+// step: 0(기본), 1(미수령), 2(기본), 3(미수령), 4(기본)
 const TodayCheck = () => {
   const navigation = useNavigation();
+  const route = useRoute();
   const { userId } = useUser();
-  const [showDashboardIcon, setShowDashboardIcon] = useState(false);
-  const [todaySchedules, setTodaySchedules] = useState<Schedule[]>([]);
+  const [step, setStep] = useState(0);
+  const timerRef = useRef<any>(null);
+  const [isChecked, setIsChecked] = useState(false);
 
-  // 오늘 일정 조회
-  const fetchTodaySchedule = async () => {
-    try {
-      if (!userId) return;
-      const schedules = await api.schedule.getTodaySchedule(parseInt(userId));
-      console.log('✅ 받아온 일정:', schedules);
-      setTodaySchedules(schedules);
-    } catch (error) {
-      console.error('오늘 일정 조회 실패:', error);
-      Alert.alert('오류', '오늘 일정을 불러오는데 실패했습니다.');
-    }
+  const { medicationHour, medicationMinute, message, scheduleId } = route.params as {
+    medicationHour: number;
+    medicationMinute: number;
+    message: string;
+    scheduleId: number;
   };
 
-  // 컴포넌트 마운트 시 일정 조회
+  // 단계별 상태 전환
   useEffect(() => {
-    fetchTodaySchedule();
-  }, [userId]);
-
-  // 3초 후에 대시보드 아이콘 표시
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      setShowDashboardIcon(true);
-    }, 3000);
-
-    return () => clearTimeout(timer);
-  }, []);
-
-  const handleComplete = async (scheduleId: number) => {
-    try {
-      await api.schedule.completeSchedule(scheduleId);
-      Alert.alert('알림', '일정이 완료되었습니다.');
-      fetchTodaySchedule();
-    } catch (error) {
-      console.error('일정 완료 처리 실패:', error);
-      Alert.alert('오류', '일정 완료 처리에 실패했습니다.');
+    if (step < 4) {
+      timerRef.current = setTimeout(() => {
+        setStep(prev => prev + 1);
+      }, 3000);
     }
-  };
+    return () => {
+      if (timerRef.current) clearTimeout(timerRef.current);
+    };
+  }, [step]);
 
-  const handleDelete = async (title: string) => {
-    try {
-      if (!userId) return;
-      await api.schedule.deleteSchedule(parseInt(userId), title);
-      Alert.alert('알림', '일정이 삭제되었습니다.');
-      fetchTodaySchedule();
-    } catch (error) {
-      console.error('일정 삭제 실패:', error);
-      Alert.alert('오류', '일정 삭제에 실패했습니다.');
-    }
+  const formatTime = (hour: number, minute: number) => {
+    const period = hour < 12 ? '오전' : '오후';
+    const displayHour = hour % 12 || 12;
+    const displayMinute = minute.toString().padStart(2, '0');
+    return `${period} ${displayHour}:${displayMinute}`;
   };
 
   const handleCheck = async () => {
+    if (step !== 0 && step !== 2 && step !== 4) return; // 기본 상태에서만 동작
     try {
-      await api.schedule.completeSchedule(1); // 실제 scheduleId로 변경 필요
-      Alert.alert(
-        '일정 확인',
-        '일정이 확인되었습니다.',
-        [
-          {
-            text: '확인',
-            onPress: () => navigation.navigate('Main' as never)
-          }
-        ]
-      );
+      if (!scheduleId) {
+        throw new Error('일정 ID가 없습니다.');
+      }
+      setIsChecked(true);
+      await api.schedule.completeSchedule(scheduleId);
+      if (Platform.OS === 'android') {
+        BackHandler.exitApp();
+      } else {
+        const { UIBackgroundTaskInvalid } = require('react-native').NativeModules;
+        if (UIBackgroundTaskInvalid) {
+          UIBackgroundTaskInvalid();
+        }
+      }
     } catch (error) {
-      console.error('일정 확인 실패:', error);
       Alert.alert('오류', '일정 확인에 실패했습니다.');
+      setIsChecked(false);
     }
   };
 
+  // 상태별 버튼 렌더링
+  let buttonContent;
+  if (step === 1 || step === 3) {
+    // 미수령 상태
+    buttonContent = (
+      <View style={styles.missedButton}>
+        <View style={[
+          styles.checkButtonContainer,
+          styles.missedButtonContainer
+        ]}>
+          <Image 
+            source={require('../assets/images/icons/dashicons_no.png')}
+            style={styles.checkIcon}
+          />
+        </View>
+      </View>
+    );
+  } else {
+    // 기본 상태
+    buttonContent = (
+      <TouchableOpacity style={styles.checkButton} onPress={handleCheck}>
+        <View style={[
+          styles.checkButtonContainer,
+          isChecked && styles.checkButtonContainerChecked
+        ]}>
+          <Image 
+            source={isChecked 
+              ? require('../assets/images/icons/white_check.png')
+              : require('../assets/images/icons/mdi_check-bold.png')
+            }
+            style={styles.checkIcon}
+          />
+          <Text style={[
+            styles.checkButtonText,
+            isChecked && styles.checkButtonTextChecked
+          ]}>확인</Text>
+        </View>
+      </TouchableOpacity>
+    );
+  }
+
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>오늘의 일정 확인</Text>
-      <Text style={styles.subtitle}>아래에서 오늘의 일정을 확인하고 관리하세요.</Text>
-      <ScrollView style={styles.scrollView}>
-        {todaySchedules.length === 0 ? (
-          <Text style={styles.emptyText}>오늘 일정이 없습니다.</Text>
-        ) : (
-          todaySchedules.map((schedule, idx) => (
-            <View key={schedule.id || idx} style={styles.scheduleItem}>
-              <Text style={styles.scheduleTitle}>{schedule.title}</Text>
-              <Text style={styles.scheduleType}>유형: {schedule.type}</Text>
-              <View style={styles.buttonRow}>
-                <TouchableOpacity
-                  style={[styles.actionButton, { backgroundColor: '#2ecc71' }]}
-                  onPress={() => handleComplete(schedule.id!)}
-                >
-                  <Text style={styles.buttonText}>완료</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={[styles.actionButton, { backgroundColor: '#e74c3c' }]}
-                  onPress={() => handleDelete(schedule.title)}
-                >
-                  <Text style={styles.buttonText}>삭제</Text>
-                </TouchableOpacity>
-              </View>
-            </View>
-          ))
-        )}
-      </ScrollView>
-
-      <TouchableOpacity 
-        style={styles.checkButton}
-        onPress={handleCheck}
-      >
-        <Text style={styles.checkButtonText}>일정 확인하기</Text>
-      </TouchableOpacity>
-
-      {showDashboardIcon && (
-        <TouchableOpacity
-          style={styles.dashboardIcon}
-          onPress={() => navigation.navigate('Main' as never)}
-        >
-          <Ionicons name="home" size={24} color="#007AFF" />
-        </TouchableOpacity>
-      )}
+      <Text style={styles.timeText}>{formatTime(medicationHour, medicationMinute)}</Text>
+      <Text style={styles.messageText}>{message}</Text>
+      {buttonContent}
     </View>
   );
 };
@@ -134,77 +123,76 @@ const TodayCheck = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    padding: 20,
-    backgroundColor: '#fff',
+    backgroundColor: '#FFFFFF',
+    alignItems: 'center',
+    paddingTop: 100,
+    paddingHorizontal: 20,
   },
-  title: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    marginBottom: 10,
-  },
-  subtitle: {
-    fontSize: 16,
-    color: '#666',
-    marginBottom: 20,
-  },
-  scrollView: {
-    flex: 1,
-  },
-  emptyText: {
+  timeText: {
+    fontSize: 36,
+    fontWeight: '800',
+    color: '#6A6767',
     textAlign: 'center',
-    color: '#aaa',
-    marginTop: 40,
-    fontSize: 16,
+    lineHeight: 50,
+    marginBottom: 50,
   },
-  scheduleItem: {
-    backgroundColor: '#f4f4f4',
-    borderRadius: 8,
-    padding: 16,
-    marginBottom: 16,
-  },
-  scheduleTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    marginBottom: 4,
-  },
-  scheduleType: {
-    fontSize: 14,
-    color: '#888',
-    marginBottom: 8,
-  },
-  buttonRow: {
-    flexDirection: 'row',
-    justifyContent: 'flex-end',
-    gap: 10,
-  },
-  actionButton: {
-    paddingVertical: 6,
-    paddingHorizontal: 16,
-    borderRadius: 6,
-    marginLeft: 8,
-  },
-  buttonText: {
-    color: '#fff',
-    fontWeight: 'bold',
+  messageText: {
+    fontSize: 34,
+    fontWeight: '800',
+    color: '#000000',
+    textAlign: 'center',
+    lineHeight: 42,
+    marginBottom: 20
   },
   checkButton: {
-    backgroundColor: '#007AFF',
-    paddingHorizontal: 30,
-    paddingVertical: 15,
+    width: 275,
+    height: 269,
+  },
+  checkButtonContainer: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#FFFFFF',
+    borderWidth: 5,
+    borderColor: '#038C3E',
     borderRadius: 10,
-    marginBottom: 20,
+    ...Platform.select({
+      ios: {
+        shadowColor: '#000',
+        shadowOffset: { width: 4, height: 4 },
+        shadowOpacity: 0.25,
+        shadowRadius: 8,
+      },
+      android: {
+        elevation: 8,
+      },
+    }),
+  },
+  checkButtonContainerChecked: {
+    backgroundColor: '#038C3E',
+  },
+  checkIcon: {
+    width: 125,
+    height: 125,
+    marginBottom: 6,
   },
   checkButtonText: {
-    color: '#fff',
-    fontSize: 18,
-    fontWeight: 'bold',
+    fontSize: 60,
+    fontWeight: '600',
+    color: '#000000',
+    lineHeight: 90,
+    textAlign: 'center',
   },
-  dashboardIcon: {
-    position: 'absolute',
-    top: 20,
-    right: 20,
-    padding: 10,
+  checkButtonTextChecked: {
+    color: '#FFFFFF',
+  },
+  missedButton: {
+    width: 275,
+    height: 269,
+  },
+  missedButtonContainer: {
+    borderColor: '#CC141C',
   },
 });
 
-export default TodayCheck; 
+export default TodayCheck;
