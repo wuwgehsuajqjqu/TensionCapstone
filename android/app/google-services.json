@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "599194442389",
+    "project_id": "dasom-fcm",
+    "storage_bucket": "dasom-fcm.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:599194442389:android:7db1a96e0db32fc65dd99c",
+        "android_client_info": {
+          "package_name": "com.tension1"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCjxoV-_ejBYhhcu7OutskfuU07wArwlBQ"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
